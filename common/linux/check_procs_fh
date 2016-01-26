@@ -1,0 +1,157 @@
+#!/usr/bin/perl
+use File::Basename;
+use Getopt::Long;
+
+use warnings;
+use strict;
+
+my $CRITICAL = 2;
+my $WARNING = 1;
+my $OK = 0;
+
+my $stmap = {
+    2	=> 'CRITICAL',
+    1	=> 'WARNING',
+    0	=> 'OK'
+};
+
+my $checkName = 'pass_ProcFD';
+
+my $exe_maxlen = 15;
+my $warning = 80;
+my $critical = 90;
+my $verbose = 0;
+
+GetOptions(
+	   "w=i" => \$warning,
+	   "c=i" => \$critical,
+	   "v" => \$verbose
+) or die "Cannot parse options, $!\n";
+
+
+my $msg = "$checkName OK: No processes near fd limit\n";
+my $status = $OK;
+
+sub getPids()
+{
+    opendir(PROCDIR,'/proc') or die "Cannot open /proc, $!\n";
+    my @pids = grep /^\d+$/, readdir(PROCDIR);
+    closedir(PROCDIR);
+    return @pids;
+}
+
+sub checkProcesses()
+{
+    my $result = {};
+    my @pidList = &getPids();
+    foreach my $pid (@pidList) {
+	local *FH;
+	local *DH;
+	
+	my $limit = -1;
+	if (open FH, "/proc/$pid/limits") {
+	    while (<FH>) {
+		chomp;
+    		if ($_ =~ /Max open files\s+(\d+)/) {
+    		    $limit = int($1);
+    		    last;
+    		}
+	    }
+	    close FH;
+	}
+	next if ($limit == -1);
+
+	my @cmdline = ();
+	if (open FH, "/proc/$pid/cmdline") {
+	    while (<FH>) {
+		chomp;
+		@cmdline = split("[\x00]", $_);
+		last;
+	    }
+	    close FH;
+	}
+
+	my $exePath = readlink("/proc/$pid/exe");
+	if (!defined($exePath)) {
+	    $exePath = 0;
+	}
+
+	my $fdCount = 0;
+	if (opendir(DH,"/proc/$pid/fd")) {
+	    $fdCount = scalar( grep /^\d/, readdir(DH) );
+	    closedir(DH);
+	}
+	
+	next if (!$exePath && $#cmdline == -1);
+
+	my $percentage = int(($fdCount * 100)/$limit);
+	my $st = "OK";
+	if ($percentage >= $critical) {
+	    #print "$test CRITICAL: Process $pid $percentage% open filehandles: $fdCount/$limit\n";
+	    $st = "CRITICAL";
+	    $status = $CRITICAL;
+	} elsif ($percentage >= $warning) {
+	    #print "$test CRITICAL: Process $pid $percentage% open filehandles: $fdCount/$limit\n";
+	    $st = "WARNING";
+	    if ($status != $CRITICAL) {
+		$status = $WARNING;
+	    }
+	}
+
+	if ($st ne 'OK') {
+	    $result->{$pid} = {
+		'exe'		=> $exePath,
+		'cmdline'	=> \@cmdline,
+		'fdCount'	=> $fdCount,
+		'limit'		=> $limit,
+		'percentage'	=> $percentage,
+		'status'	=> $st
+	    };
+	}
+    }
+    return $result;
+}
+
+use Data::Dumper;
+sub formatCommand()
+{
+    my $cur = shift || return "-";
+    my $retval = "-";
+    my $cmd = "";
+    my @cmdline = @{$cur->{'cmdline'}};
+    my $cmdcount = scalar @cmdline;
+    my $exe = $cur->{'exe'};
+    if ($exe) {
+	$retval = $cmd = basename($exe);
+    } else {
+	$retval = $cmd = $cmdline[0];
+    }
+    if ($cmd =~ /^(perl|bash|python|ruby|php|node)/ && $cmdcount >= 2) {
+	$retval = basename($cmdline[1]);
+    }
+
+    if (length($retval) > $exe_maxlen) {
+	$retval = substr($retval, 0, $exe_maxlen-3) . "...";
+    }
+    return $retval;
+}
+
+sub main()
+{
+    my $result = &checkProcesses();
+    my @results = ();
+
+    foreach my $pid (keys %{$result}) {
+	my $cur = $result->{$pid};
+	push(@results, sprintf("(%s:%s;%d;%d/%d)", substr($cur->{'status'},0,1), &formatCommand($cur), $pid, $cur->{'fdCount'}, $cur->{'limit'}));
+    }
+    if (scalar @results == 0) {
+	print $msg;
+	exit $OK;
+    } else {
+	printf("$checkName %s: %s\n", $stmap->{$status}, join(", ", @results));
+	exit $status;
+    }
+}
+
+&main();
