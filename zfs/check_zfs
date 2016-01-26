@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use constant N_OK		=> 0;
+use constant N_WARNING		=> 1;
+use constant N_CRITICAL		=> 2;
+use constant N_MSG => [ "OK", "WARNING", "ERROR" ];
+
+use Data::Dumper;
+
+my @zpool = ();
+
+sub get_pools() {
+    local *P;
+    open(P, "/sbin/zpool list -H 2>&1 |");
+    while (<P>) {
+	chomp;
+	my @ret = split(/\s+/, $_);
+	push(@zpool, {
+	    'name'	=> $ret[0],
+	    'health'	=> $ret[8],
+	    'size'	=> $ret[1],
+	    'alloc'	=> $ret[2],
+	    'free'	=> $ret[3]
+	});
+    }
+    close(P);
+}
+
+sub main() {
+
+    &get_pools();
+    my $exit_status = 0;
+    my @out = ();
+    foreach my $pool (@zpool) {
+	if ($pool->{'health'} ne 'ONLINE') {
+	    $exit_status = N_WARNING;
+	}
+	push(@out, sprintf("%s(%s %s/%s)", $pool->{'name'}, $pool->{'health'}, $pool->{'alloc'}, $pool->{'size'}));
+    }
+    my $msg = sprintf "%s %s\n", N_MSG->[$exit_status], join(",", @out);
+    print $msg;
+    exit($exit_status);
+}
+
+&main();
