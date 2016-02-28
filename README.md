@@ -7,6 +7,8 @@ just some basic nagios plugin
 ```
 # /usr/lib/nagios/plugins/check_zfs # one pool
 OK storage-02(ONLINE 10.3T/87T),storage-03(ONLINE 75.6T/87T),storage-81(ONLINE 1.00T/87T)
+# resilver example
+WARNING storage-02(ONLINE 11.1T/87T),storage-03(RESILVER 18.53%,223M/s,82h51m),storage-81(ONLINE 1.00T/87T) 
 # /usr/lib/nagios/plugins/check_zfs # multiple storage pool
 OK storage-03(ONLINE 118T/390T)
 ```
