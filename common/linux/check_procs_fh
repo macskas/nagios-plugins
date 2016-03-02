@@ -112,7 +112,6 @@ sub checkProcesses()
     return $result;
 }
 
-use Data::Dumper;
 sub formatCommand()
 {
     my $cur = shift || return "-";
