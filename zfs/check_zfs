@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use English;
 
 $ENV{'PATH'} = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
@@ -14,7 +15,8 @@ my @zpool = ();
 
 sub get_pools() {
     local *P;
-    open(P, "zpool list -H 2>&1 |") or &nagios_response("Could not find zpool command", N_CRITICAL);
+    my $zpool_cmd = $EUID == 0 ? "zpool" : "sudo zpool";
+    open(P, $zpool_cmd . " list -H 2>&1 |") or &nagios_response("Could not find zpool command", N_CRITICAL);
     while (<P>) {
 	chomp;
 	my @ret = split(/\s+/, $_);
@@ -39,7 +41,8 @@ sub get_status()
     my $cat = 0;
     my $res = {};
     local *P;
-    open(P, "zpool status $storage 2>&1 |") or &nagios_response("Could not find zpool command", N_CRITICAL);
+    my $zpool_cmd = $EUID == 0 ? "zpool" : "sudo zpool";
+    open(P, $zpool_cmd . " status $storage 2>&1 |") or &nagios_response("Could not find zpool command", N_CRITICAL);
 	while (<P>) {
 	    chomp;
 	    if ($_ =~ /^\s*([^\s]+):\s*(.*)$/) {
