@@ -59,3 +59,16 @@ pass_ProcFD CRITICAL: (W:sshd;3148;11/1024), (C:syslog-ng;7486;2004/65536), (W:u
 
 #### example cronjob
 same as zfs
+
+### Check bacula job status - SQL
+/usr/lib/nagios/plugins/check_bacula
+
+#### example output
+```
+# /usr/lib/nagios/plugins/check_bacula
+pass_Bacula CRITICAL: Success: 75, Failed: 3 (Job1AutoMysqlBackupDaily, Job2AutoMysqlBackupDaily, Job3BackupDaily)
+```
+
+#### example cronjob
+same as zfs
+
