@@ -22,7 +22,7 @@ sub get_pools() {
 	my @ret = split(/\s+/, $_);
 	push(@zpool, {
 	    'name'	=> $ret[0],
-	    'health'	=> $ret[8],
+	    'health'	=> $ret[-2],
 	    'size'	=> $ret[1],
 	    'alloc'	=> $ret[2],
 	    'free'	=> $ret[3]
